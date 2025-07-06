@@ -4,7 +4,8 @@ import "math"
 
 // 对于gateway网关机来说，存在不同时期加入进来的物理机，所以机器的配置是不同的，使用负载来衡量会导致偏差。
 // 为更好的应对动态的机器配置变化，我们统计其剩余资源值，来衡量一个机器其是否更适合增加其负载。
-// 这里的数值代表的是，此endpoint对应的机器其，自身剩余的资源指标。
+
+// Stat 代表一个机器的剩余资源统计信息，每一秒钟统计一次
 type Stat struct {
 	ConnectNum   float64 // 业务上，im gateway 总体持有的长连接数量 的剩余值
 	MessageBytes float64 // 业务上，im gateway 每秒收发消息的总字节数 的剩余值
@@ -45,12 +46,17 @@ func (s *Stat) Sub(st *Stat) {
 	s.MessageBytes -= st.MessageBytes
 }
 
+// getGB 将字节数转换为GB
 func getGB(m float64) float64 {
 	return decimal(m / (1 << 30))
 }
+
+// decimal 保留两位小数
 func decimal(value float64) float64 {
-	return math.Trunc(value*1e2+0.5) * 1e-2
+	return math.Trunc(value*1e2+0.5) * 1e-2 // 这里使用了四舍五入的方式保留两位小数
 }
+
+// min 返回三个数中的最小值
 func min(a, b, c float64) float64 {
 	m := func(k, j float64) float64 {
 		if k > j {

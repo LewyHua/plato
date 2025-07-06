@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/hardcore-os/plato/ipconf"
+	"github.com/lewyhua/plato/ipconf"
 	"github.com/spf13/cobra"
 )
 
@@ -15,5 +15,5 @@ var ipConfCmd = &cobra.Command{
 }
 
 func IpConfHandle(cmd *cobra.Command, args []string) {
-	ipconf.RunMain(ConfigPath)
+	ipconf.RunMain()
 }

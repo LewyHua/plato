@@ -5,11 +5,10 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"net"
 	"time"
 
 	"github.com/gookit/color"
-	"github.com/hardcore-os/plato/common/sdk"
+	"github.com/lewyhua/plato/sdk"
 	"github.com/rocket049/gocui"
 )
 
@@ -60,19 +59,16 @@ func viewPrint(g *gocui.Gui, name, msg string, newline bool) {
 	g.Update(out.Show)
 }
 
-//doRecv work in goroutine
+// doRecv work in goroutine
 func doRecv(g *gocui.Gui) {
 	recvChannel := chat.Recv()
 	for msg := range recvChannel {
-		if msg != nil {
-			switch msg.Type {
-			case sdk.MsgTypeText:
-				viewPrint(g, msg.Name, msg.Content, false)
-			case sdk.MsgTypeAck:
-				//TODO 默认不处理
-			}
+		switch msg.Type {
+		case sdk.MsgTypeText:
+			viewPrint(g, msg.Name, msg.Content, false)
 		}
 	}
+	g.Close()
 }
 
 func quit(g *gocui.Gui, v *gocui.View) error {
@@ -90,13 +86,12 @@ func doSay(g *gocui.Gui, cv *gocui.View) {
 		if p != nil {
 			msg := &sdk.Message{
 				Type:       sdk.MsgTypeText,
-				Name:       "logic",
+				Name:       "Arima Kana",
 				FormUserID: "123213",
 				ToUserID:   "222222",
 				Content:    string(p)}
 			// 先把自己说的话显示到消息流中
-			idKey := fmt.Sprintf("%d", chat.GetCurClientID())
-			viewPrint(g, "me:"+idKey, msg.Content, false)
+			viewPrint(g, "Me", msg.Content, false)
 			chat.Send(msg)
 		}
 		v.Autoscroll = true
@@ -173,7 +168,7 @@ func viewHead(g *gocui.Gui, x0, y0, x1, y1 int) error {
 		}
 		v.Wrap = false
 		v.Overwrite = true
-		msg := "plato: im系统聊天对话框"
+		msg := "开始聊天了!"
 		setHeadText(g, msg)
 	}
 	return nil
@@ -228,7 +223,7 @@ func pasteDown(g *gocui.Gui, cv *gocui.View) error {
 
 func RunMain() {
 	// step1 创建chat的核心对象
-	chat = sdk.NewChat(net.ParseIP("0.0.0.0"), 8900, "logic", "12312321", "2131")
+	chat = sdk.NewChat("127.0.0.1:8080", "lewyhua", "00001", "2131")
 	// step2 创建 GUI 图层对象并进行参与与回调函数的配置
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
@@ -261,15 +256,11 @@ func RunMain() {
 	if err := g.SetKeybinding("main", gocui.KeyArrowUp, gocui.ModNone, pasteUP); err != nil {
 		log.Panicln(err)
 	}
-	go func() {
-		time.Sleep(10 * time.Second)
-		// 重新连接
-		chat.ReConn()
-	}()
 	// 启动消费函数
 	go doRecv(g)
 	if err := g.MainLoop(); err != nil {
 		log.Println(err)
 	}
+
 	ioutil.WriteFile("chat.log", []byte(buf), 0644)
 }

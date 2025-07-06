@@ -3,25 +3,25 @@ package discovery
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/bytedance/gopkg/util/logger"
-	"github.com/hardcore-os/plato/common/config"
-	"go.etcd.io/etcd/api/v3/mvccpb"
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
+	"go.etcd.io/etcd/clientv3"
 )
 
-//ServiceDiscovery 服务发现
+// ServiceDiscovery 服务发现
 type ServiceDiscovery struct {
 	cli  *clientv3.Client //etcd client
 	lock sync.Mutex
 	ctx  *context.Context
 }
 
-//NewServiceDiscovery  新建发现服务
-func NewServiceDiscovery(ctx *context.Context) *ServiceDiscovery {
+// NewServiceDiscovery  新建发现服务
+func NewServiceDiscovery(ctx *context.Context, endpoints []string) *ServiceDiscovery {
 	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   config.GetEndpointsForDiscovery(),
-		DialTimeout: config.GetTimeoutForDiscovery(),
+		Endpoints:   endpoints,
+		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
 		logger.Fatal(err)
@@ -33,7 +33,7 @@ func NewServiceDiscovery(ctx *context.Context) *ServiceDiscovery {
 	}
 }
 
-//WatchService 初始化服务列表和监视
+// WatchService 初始化服务列表和监视
 func (s *ServiceDiscovery) WatchService(prefix string, set, del func(key, value string)) error {
 	//根据前缀获取现有的key
 	resp, err := s.cli.Get(*s.ctx, prefix, clientv3.WithPrefix())
@@ -45,13 +45,13 @@ func (s *ServiceDiscovery) WatchService(prefix string, set, del func(key, value 
 		set(string(ev.Key), string(ev.Value))
 	}
 	//监视前缀，修改变更的server
-	s.watcher(prefix, resp.Header.Revision+1, set, del)
+	s.watcher(prefix, set, del)
 	return nil
 }
 
-//watcher 监听前缀
-func (s *ServiceDiscovery) watcher(prefix string, rev int64, set, del func(key, value string)) {
-	rch := s.cli.Watch(*s.ctx, prefix, clientv3.WithPrefix(), clientv3.WithRev(rev))
+// watcher 监听前缀
+func (s *ServiceDiscovery) watcher(prefix string, set, del func(key, value string)) {
+	rch := s.cli.Watch(*s.ctx, prefix, clientv3.WithPrefix())
 	logger.CtxInfof(*s.ctx, "watching prefix:%s now...", prefix)
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
@@ -65,7 +65,7 @@ func (s *ServiceDiscovery) watcher(prefix string, rev int64, set, del func(key, 
 	}
 }
 
-//Close 关闭服务
+// Close 关闭服务
 func (s *ServiceDiscovery) Close() error {
 	return s.cli.Close()
 }

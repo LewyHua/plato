@@ -6,21 +6,21 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
-type IpConfContext struct {
+type ClientContext struct {
+	IP string `json:"ip"`
+}
+
+type IPConfContext struct {
 	Ctx       *context.Context
 	AppCtx    *app.RequestContext
 	ClientCtx *ClientContext
 }
 
-type ClientContext struct {
-	IP string `json:"ip"`
-}
-
-func BuildIpConfContext(c *context.Context, ctx *app.RequestContext) *IpConfContext {
-	ipConfContext := &IpConfContext{
+// BuildIPConfContext constructs an IPConfContext from the given context and app.RequestContext.
+func BuildIPConfContext(c *context.Context, ctx *app.RequestContext) *IPConfContext {
+	return &IPConfContext{
 		Ctx:       c,
 		AppCtx:    ctx,
-		ClientCtx: &ClientContext{},
+		ClientCtx: &ClientContext{IP: ctx.ClientIP()},
 	}
-	return ipConfContext
 }

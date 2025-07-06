@@ -1,20 +1,16 @@
 package ipconf
 
-import (
-	"github.com/hardcore-os/plato/ipconf/domain"
-)
-
-func top5Endports(eds []*domain.Endport) []*domain.Endport {
-	if len(eds) < 5 {
+func top5Endpoints(eds []*domain.Endpoint) []*domain.Endpoint {
+	if len(eds) <= 5 {
 		return eds
 	}
 	return eds[:5]
 }
 
-func packRes(ed []*domain.Endport) Response {
+func packRes(eds []*domain.Endpoint) Response {
 	return Response{
-		Message: "ok",
+		Message: "OK",
 		Code:    0,
-		Data:    ed,
+		Data:    eds,
 	}
 }
