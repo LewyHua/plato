@@ -7,14 +7,14 @@ import (
 
 type Endpoint struct {
 	IP          string       `json:"ip"`
-	Port        int          `json:"port"`
+	Port        string       `json:"port"`
 	ActiveScore float64      `json:"active_score"`
 	StaticScore float64      `json:"static_score"`
 	Stats       *Stat        `json:"-"`
 	window      *stateWindow `json:"-"`
 }
 
-func NewEndPoint(ip string, port int) *Endpoint {
+func NewEndPoint(ip, port string) *Endpoint {
 	ed := &Endpoint{
 		IP:   ip,
 		Port: port,

@@ -1,5 +1,7 @@
 package ipconf
 
+import "github.com/lewyhua/plato/ipconf/domain"
+
 func top5Endpoints(eds []*domain.Endpoint) []*domain.Endpoint {
 	if len(eds) <= 5 {
 		return eds

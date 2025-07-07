@@ -3,10 +3,10 @@ package discovery
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/bytedance/gopkg/util/logger"
-	"go.etcd.io/etcd/clientv3"
+	"github.com/lewyhua/plato/common/config"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // ServiceRegister 创建租约注册服务
@@ -21,10 +21,12 @@ type ServiceRegister struct {
 }
 
 // NewServiceRegister 新建注册服务
-func NewServiceRegister(ctx *context.Context, endpoints []string, key string, endportinfo *EndpointInfo, lease int64) (*ServiceRegister, error) {
+func NewServiceRegister(ctx *context.Context, key string, endpointInfo *EndpointInfo, lease int64) (*ServiceRegister, error) {
+	// log.Println("REGISTER: EndpointsForDiscovery:", config.GetEndpointsForDiscovery())
+	// log.Println("REGISTER: TsimeoutForDiscovery:", config.GetTimeoutForDiscovery())
 	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: 5 * time.Second,
+		Endpoints:   config.GetEndpointsForDiscovery(),
+		DialTimeout: config.GetTimeoutForDiscovery(),
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -33,7 +35,7 @@ func NewServiceRegister(ctx *context.Context, endpoints []string, key string, en
 	ser := &ServiceRegister{
 		cli: cli,
 		key: key,
-		val: endportinfo.Marshal(),
+		val: endpointInfo.MarshalEndpointInfo(),
 		ctx: ctx,
 	}
 
@@ -48,8 +50,10 @@ func NewServiceRegister(ctx *context.Context, endpoints []string, key string, en
 // 设置租约
 func (s *ServiceRegister) putKeyWithLease(lease int64) error {
 	//设置租约时间
+
 	resp, err := s.cli.Grant(*s.ctx, lease)
 	if err != nil {
+		log.Println("putKeyWithLease err:", err)
 		return err
 	}
 	//注册服务并绑定租约
@@ -68,7 +72,7 @@ func (s *ServiceRegister) putKeyWithLease(lease int64) error {
 }
 
 func (s *ServiceRegister) UpdateValue(val *EndpointInfo) error {
-	value := val.Marshal()
+	value := val.MarshalEndpointInfo()
 	_, err := s.cli.Put(*s.ctx, s.key, value, clientv3.WithLease(s.leaseID))
 	if err != nil {
 		return err

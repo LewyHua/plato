@@ -10,7 +10,7 @@ type EndpointInfo struct {
 	MetaData map[string]interface{} `json:"meta"`
 }
 
-func UnMarshal(data []byte) (*EndpointInfo, error) {
+func UnMarshalEndpointInfo(data []byte) (*EndpointInfo, error) {
 	ed := &EndpointInfo{}
 	err := json.Unmarshal(data, ed)
 	if err != nil {
@@ -18,7 +18,7 @@ func UnMarshal(data []byte) (*EndpointInfo, error) {
 	}
 	return ed, nil
 }
-func (edi *EndpointInfo) Marshal() string {
+func (edi *EndpointInfo) MarshalEndpointInfo() string {
 	data, err := json.Marshal(edi)
 	if err != nil {
 		panic(err)

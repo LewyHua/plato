@@ -2,12 +2,13 @@ package discovery
 
 import (
 	"context"
+	"log"
 	"sync"
-	"time"
 
 	"github.com/bytedance/gopkg/util/logger"
-	"github.com/coreos/etcd/mvcc/mvccpb"
-	"go.etcd.io/etcd/clientv3"
+	"github.com/lewyhua/plato/common/config"
+	"go.etcd.io/etcd/api/v3/mvccpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // ServiceDiscovery 服务发现
@@ -18,10 +19,12 @@ type ServiceDiscovery struct {
 }
 
 // NewServiceDiscovery  新建发现服务
-func NewServiceDiscovery(ctx *context.Context, endpoints []string) *ServiceDiscovery {
+func NewServiceDiscovery(ctx *context.Context) *ServiceDiscovery {
+	// log.Println("DISCOVERY: EndpointsForDiscovery:", config.GetEndpointsForDiscovery())
+	// log.Println("DISCOVERY: TimeoutForDiscovery:", config.GetTimeoutForDiscovery())
 	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: 5 * time.Second,
+		Endpoints:   config.GetEndpointsForDiscovery(),
+		DialTimeout: config.GetTimeoutForDiscovery(),
 	})
 	if err != nil {
 		logger.Fatal(err)
@@ -36,10 +39,12 @@ func NewServiceDiscovery(ctx *context.Context, endpoints []string) *ServiceDisco
 // WatchService 初始化服务列表和监视
 func (s *ServiceDiscovery) WatchService(prefix string, set, del func(key, value string)) error {
 	//根据前缀获取现有的key
+	// log.Println("DISCOVERY: Watching prefix:", prefix)
 	resp, err := s.cli.Get(*s.ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return err
 	}
+	log.Println("DISCOVERY: Initial keys found:", len(resp.Kvs))
 
 	for _, ev := range resp.Kvs {
 		set(string(ev.Key), string(ev.Value))

@@ -1,25 +1,51 @@
 package source
 
-import "context"
+import (
+	"context"
+
+	"github.com/bytedance/gopkg/util/logger"
+	"github.com/lewyhua/plato/common/config"
+	"github.com/lewyhua/plato/common/discovery"
+)
 
 func Init() {
 	eventChan = make(chan *Event)
 	ctx := context.Background()
 	go DataHandler(&ctx)
+	if config.IsDebug() {
+		ctx := context.Background()
+		testServiceRegister(&ctx, "7896", "node1")
+		testServiceRegister(&ctx, "7897", "node2")
+		testServiceRegister(&ctx, "7898", "node3")
+	}
 }
 
-// DataHandler 服务发现处理
+// 服务发现处理
 func DataHandler(ctx *context.Context) {
-	// 这里可以添加数据处理逻辑
-	// 例如监听事件通道，处理数据等
-	for event := range EventChan() {
-		switch event.Type {
-		case AddNodeEvent:
-			// 处理添加节点事件
-		case DelNodeEvent:
-			// 处理删除节点事件
-		default:
-			// 处理其他类型的事件
+	dis := discovery.NewServiceDiscovery(ctx)
+	defer dis.Close()
+	setFunc := func(key, value string) {
+		if ed, err := discovery.UnMarshalEndpointInfo([]byte(value)); err == nil {
+			if event := NewEvent(ed); ed != nil {
+				event.Type = AddNodeEventType
+				eventChan <- event
+			}
+		} else {
+			logger.CtxErrorf(*ctx, "DataHandler.setFunc.err :%s", err.Error())
 		}
+	}
+	delFunc := func(key, value string) {
+		if ed, err := discovery.UnMarshalEndpointInfo([]byte(value)); err == nil {
+			if event := NewEvent(ed); ed != nil {
+				event.Type = DelNodeEventType
+				eventChan <- event
+			}
+		} else {
+			logger.CtxErrorf(*ctx, "DataHandler.delFunc.err :%s", err.Error())
+		}
+	}
+	err := dis.WatchService(config.GetServicePathForIPConf(), setFunc, delFunc)
+	if err != nil {
+		panic(err)
 	}
 }

@@ -5,22 +5,34 @@ import (
 	"log"
 	"testing"
 	"time"
+
+	"github.com/lewyhua/plato/common/config"
 )
 
-func TestServiceRegiste(t *testing.T) {
-	var endpoints = []string{"localhost:2379"}
+func TestServiceRegister(t *testing.T) {
+	// endpoints := []string{"localhost:2379"}
+	// endpoints := []string{"http://my-etcd:2379"}
+	config.Init("../../plato.yaml") // 初始化配置
+
 	ctx := context.Background()
-	ser, err := NewServiceRegister(&ctx, endpoints, "/web/node1", &EndpointInfo{
+
+	// 注册服务
+	ser, err := NewServiceRegister(&ctx, "/web/node1", &EndpointInfo{
 		IP:   "127.0.0.1",
 		Port: "9999",
 	}, 5)
 	if err != nil {
-		log.Fatalln(err)
+		t.Fatalf("Service register failed: %v", err)
 	}
-	//监听续租相应chan
+	defer ser.Close()
+
+	log.Println("✅ Service registered successfully")
+
+	// 开始监听续租响应
 	go ser.ListenLeaseRespChan()
-	select {
-	case <-time.After(20 * time.Second):
-		ser.Close()
-	}
+
+	time.Sleep(20 * time.Second)
+	ser.Close()
+
+	log.Println("🛑 Stopping service registration test")
 }

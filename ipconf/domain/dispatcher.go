@@ -3,6 +3,8 @@ package domain
 import (
 	"sort"
 	"sync"
+
+	"github.com/lewyhua/plato/ipconf/source"
 )
 
 type Dispatcher struct {
@@ -13,65 +15,62 @@ type Dispatcher struct {
 var dp *Dispatcher
 
 func Init() {
-	dp := &Dispatcher{
-		candidateTable: make(map[string]*Endpoint),
-	}
+	dp = &Dispatcher{}
+	dp.candidateTable = make(map[string]*Endpoint)
 	go func() {
 		for event := range source.EventChan() {
 			switch event.Type {
-			case source.AddNodeEvent:
+			case source.AddNodeEventType:
 				dp.addNode(event)
-			case source.DelNodeEvent:
+			case source.DelNodeEventType:
 				dp.delNode(event)
 			}
 		}
 	}()
 }
-
-// Dispatch 返回按照得分排序的候选节点列表
 func Dispatch(ctx *IPConfContext) []*Endpoint {
-	// 1. 获取候选节点列表
-	eds := dp.getCandidateEndpoints(ctx)
-	// 2. 对候选节点进行算分
+	// Step1: 获得候选endport
+	eds := dp.getCandidateEndport(ctx)
+	// Step2: 逐一计算得分
 	for _, ed := range eds {
 		ed.CalScore(ctx)
 	}
-	// 3. 按照得分进行排序: 先按照ActiceScore降序排序，如果相同则按照StaticScore降序排序
+	// Step3: 全局排序，动静结合的排序策略。
 	sort.Slice(eds, func(i, j int) bool {
+		// 优先基于活跃分数进行排序
+		if eds[i].ActiveScore > eds[j].ActiveScore {
+			return true
+		}
+		// 如果活跃分数相同，则使用静态分数排序
 		if eds[i].ActiveScore == eds[j].ActiveScore {
 			return eds[i].StaticScore > eds[j].StaticScore
 		}
-		return eds[i].ActiveScore > eds[j].ActiveScore
+		return false
 	})
 	return eds
 }
 
-func (d *Dispatcher) getCandidateEndpoints(ctx *IPConfContext) []*Endpoint {
-	d.RLock()
-	defer d.RUnlock()
-
+func (dp *Dispatcher) getCandidateEndport(ctx *IPConfContext) []*Endpoint {
+	dp.RLock()
+	defer dp.RUnlock()
 	candidateList := make([]*Endpoint, 0, len(dp.candidateTable))
 	for _, ed := range dp.candidateTable {
 		candidateList = append(candidateList, ed)
 	}
 	return candidateList
 }
-
-func (d *Dispatcher) addNode(event *source.Event) {
-	d.Lock()
-	defer d.Unlock()
-
+func (dp *Dispatcher) delNode(event *source.Event) {
+	dp.Lock()
+	defer dp.Unlock()
+	delete(dp.candidateTable, event.Key())
+}
+func (dp *Dispatcher) addNode(event *source.Event) {
+	dp.Lock()
+	defer dp.Unlock()
 	ed := NewEndPoint(event.IP, event.Port)
 	ed.UpdateStat(&Stat{
 		ConnectNum:   event.ConnectNum,
 		MessageBytes: event.MessageBytes,
 	})
-
-	d.candidateTable[event.Endpoint.IP] = event.Endpoint
-}
-
-func (dp *Dispatcher) delNode(event *source.Event) {
-	dp.Lock()
-	defer dp.Unlock()
-	delete(dp.candidateTable, event.Key())
+	dp.candidateTable[event.Key()] = ed
 }

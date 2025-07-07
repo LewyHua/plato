@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/common/utils"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/lewyhua/plato/ipconf/domain"
 )
@@ -16,11 +15,13 @@ type Response struct {
 }
 
 func GetIPInfoList(c context.Context, ctx *app.RequestContext) {
-	defer func() {
-		if err := recover(); err != nil {
-			ctx.JSON(consts.StatusInternalServerError, utils.H{"message": "Internal Server Error", "code": 500, "data": nil})
-		}
-	}()
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		// 打印错误日志
+	// 		logger.CtxErrorf(c, "GetIPInfoList.err :%s", err)
+	// 		ctx.JSON(consts.StatusInternalServerError, utils.H{"message": err.(error).Error(), "code": 500, "data": nil})
+	// 	}
+	// }()
 
 	// 1. 构建客户请求信息
 	ipConfCtx := domain.BuildIPConfContext(&c, ctx)

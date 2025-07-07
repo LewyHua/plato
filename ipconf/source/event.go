@@ -22,8 +22,8 @@ func EventChan() <-chan *Event {
 type Event struct {
 	Type         EventType
 	IP           string
-	Port         int
-	ConnectNum   int
+	Port         string
+	ConnectNum   float64
 	MessageBytes float64
 }
 
@@ -32,10 +32,10 @@ func NewEvent(ed *discovery.EndpointInfo) *Event {
 	if ed == nil || ed.MetaData == nil {
 		return nil
 	}
-	var connNum int
+	var connNum float64
 	var msgBytes float64
 	if data, ok := ed.MetaData["connect_num"]; ok {
-		connNum = data.(int) // 如果出错，此处应该panic 暴露错误
+		connNum = data.(float64) // 如果出错，此处应该panic 暴露错误
 	}
 	if data, ok := ed.MetaData["message_bytes"]; ok {
 		msgBytes = data.(float64) // 如果出错，此处应该panic 暴露错误
