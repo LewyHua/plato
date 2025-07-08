@@ -3,7 +3,7 @@ package perf
 import (
 	"net"
 
-	"github.com/lewyhua/plato/client/sdk"
+	"github.com/lewyhua/plato/common/sdk"
 )
 
 var (
