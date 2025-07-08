@@ -45,7 +45,6 @@ func newEPool(ln *net.TCPListener, cb func(c *connection, ep *epoller)) *ePool {
 	}
 }
 
-// 创建一个专门处理 accept 事件的协程，与当前cpu的核数对应，能够发挥最大功效
 func (e *ePool) createAcceptProcess() {
 	go func() { // 单goroutine负责accept
 		for {
