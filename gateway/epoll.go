@@ -1,11 +1,11 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"reflect"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -20,7 +20,7 @@ var tcpNum int32 // 当前服务允许接入的最大tcp连接数
 
 type ePool struct {
 	eChan        chan *net.TCPConn                 // worker accept到conn之后丢入channel，交给后序epoll池处理
-	eSize        int                               // epoll池的大小，通常与cpu核数对应
+	eSize        int                               // epoll池的数量，就是多reactor模型里的reactor数量
 	done         chan struct{}                     // 关闭epoll池的信号，用户后序优雅结束
 	listener     *net.TCPListener                  // 网关监听socket 链接
 	callBackFunc func(c *net.TCPConn, ep *epoller) // 处理非连接socket的回调函数，通常是处理业务逻辑
@@ -44,32 +44,69 @@ func newEPool(listener *net.TCPListener, callBackFunc func(c *net.TCPConn, ep *e
 }
 
 // 创建一个专门处理 accept 事件的协程，与当前cpu的核数对应，能够发挥最大功效
-func (e *ePool) createAcceptProcess() {
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go func() {
-			for {
-				conn, e := e.listener.AcceptTCP()
+//
+//	func (e *ePool) createAcceptProcess() {
+//		for i := 0; i < runtime.NumCPU(); i++ {
+//			go func() {
+//				for {
+//					conn, e := e.listener.AcceptTCP()
+//					if e != nil {
+//						// if ne, ok := e.(net.Error); ok && ne.Temporary() {
+//						if ne, ok := e.(net.Error); ok && ne.Timeout() {
+//							log.Printf("accept timeout err: %v", ne)
+//							continue
+//						}
+//						log.Printf("accept err: %v", e)
+//						continue
+//					}
+//					// 限流熔断
+//					if !checkTCPNumWithinLimit() {
+//						_ = conn.Close()
+//						continue
+//					}
+//					// 设置连接的配置，目前为手动打开keepalive
+//					setTcpConifg(conn)
+//					ep.addTaskToEventChan(conn)
+//				}
+//			}()
+//		}
+//	}
 
-				if e != nil {
-					// if ne, ok := e.(net.Error); ok && ne.Temporary() {
-					if ne, ok := e.(net.Error); ok && ne.Timeout() {
-						log.Printf("accept timeout err: %v", ne)
-						continue
-					}
-					log.Printf("accept err: %v", e)
+func (e *ePool) createAcceptProcess() {
+	go func() {
+		for {
+			conn, err := e.listener.AcceptTCP()
+			if err != nil {
+				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					log.Printf("accept timeout: %v", err)
 					continue
 				}
-				// 限流熔断
-				if !checkTCPNumWithinLimit() {
-					_ = conn.Close()
-					continue
+				if errors.Is(err, net.ErrClosed) {
+					log.Printf("listener closed, exiting accept loop")
+					return
 				}
-				// 设置连接的配置，目前为手动打开keepalive
-				setTcpConifg(conn)
-				ep.addTaskToEventChan(conn)
+				log.Printf("fatal accept error: %v", err)
+				return
 			}
-		}()
-	}
+
+			// 限流熔断
+			if !checkConnRate() {
+				log.Printf("connection from %v rejected by rate limiter", conn.RemoteAddr())
+				conn.Close()
+				continue
+			}
+
+			// 设置连接的配置，目前为手动打开keepalive
+			setTCPConfig(conn)
+
+			select {
+			case e.eChan <- conn:
+			default:
+				log.Printf("task queue full, closing connection from %v", conn.RemoteAddr())
+				conn.Close()
+			}
+		}
+	}()
 }
 
 func (e *ePool) startEPool() {
@@ -94,7 +131,7 @@ func (e *ePool) startEProc() {
 				addTcpNum()
 				fmt.Printf("tcpNum:%d\n", tcpNum)
 				if err := ep.add(conn); err != nil {
-					fmt.Printf("failed to add connection %v\n", err)
+					fmt.Printf("failed to add connection to epoll tree %v\n", err)
 					_ = conn.Close() //登录未成功直接关闭连接
 					continue
 				}
@@ -109,7 +146,6 @@ func (e *ePool) startEProc() {
 			return
 		default:
 			connections, err := ep.Wait(200) // 200ms 一次轮询避免 忙轮询
-
 			if err != nil && err != syscall.EINTR {
 				fmt.Printf("failed to epoll wait %v\n", err)
 				continue
@@ -212,13 +248,13 @@ func subTcpNum() {
 }
 
 // checkTcp 检查当前tcp连接数是否超过限制
-func checkTCPNumWithinLimit() bool {
+func checkConnRate() bool {
 	num := getTcpNum()
 	maxTCPNum := config.GetGatewayMaxTCPNum()
 	return num <= maxTCPNum
 }
 
-// setTcpConifg 设置tcp连接的配置，当前为手动打开keepalive，以为开启长连接
-func setTcpConifg(c *net.TCPConn) {
+// setTCPConfig 设置tcp连接的配置，当前为手动打开keepalive，以为开启长连接
+func setTCPConfig(c *net.TCPConn) {
 	_ = c.SetKeepAlive(true)
 }

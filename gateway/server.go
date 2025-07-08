@@ -18,7 +18,7 @@ func RunMain(path string) {
 		log.Fatalf("StartTCPEPollServer err:%s", err.Error())
 		panic(err)
 	}
-	initWorkPoll()
+	initWorkPoll() // 初始化工作池
 	initEpoll(listener, runProc)
 	fmt.Println("-------------im gateway stated------------")
 	select {}
@@ -36,6 +36,7 @@ func runProc(conn *net.TCPConn, ep *epoller) {
 			Len:  uint32(len(dataBuf)),
 			Data: dataBuf,
 		}
+		// 目前只是直接返回给了客户端，后续可以改为调用 state server rpc
 		tcp.SendData(conn, bytes.Marshal())
 	})
 	if err != nil {
