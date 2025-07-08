@@ -23,7 +23,7 @@ func testServiceRegister(ctx *context.Context, port, node string) {
 	log.Printf("🔍 Starting service registration for node %s on port %s", node, port)
 	go func() {
 		ed := discovery.EndpointInfo{
-			IP:   "127.0.0.1",
+			IP:   "0.0.0.0",
 			Port: port,
 			MetaData: map[string]interface{}{
 				"connect_num":   float64(rand.Int63n(12312321231231131)),

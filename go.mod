@@ -8,11 +8,13 @@ require (
 	github.com/bytedance/gopkg v0.0.0-20220817015305-b879a72dc90f
 	github.com/cloudwego/hertz v0.2.1
 	github.com/gookit/color v1.5.1
+	github.com/panjf2000/ants v1.3.0
 	github.com/rocket049/gocui v0.3.2
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.20.1
 	go.etcd.io/etcd/api/v3 v3.5.11
 	go.etcd.io/etcd/client/v3 v3.5.11
+	golang.org/x/sys v0.29.0
 )
 
 require google.golang.org/protobuf v1.36.1 // indirect
@@ -56,7 +58,6 @@ require (
 	go.uber.org/zap v1.17.0 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241223144023-3abc09e42ca8 // indirect

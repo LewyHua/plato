@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/bytedance/gopkg/util/logger"
@@ -20,8 +19,6 @@ type ServiceDiscovery struct {
 
 // NewServiceDiscovery  新建发现服务
 func NewServiceDiscovery(ctx *context.Context) *ServiceDiscovery {
-	// log.Println("DISCOVERY: EndpointsForDiscovery:", config.GetEndpointsForDiscovery())
-	// log.Println("DISCOVERY: TimeoutForDiscovery:", config.GetTimeoutForDiscovery())
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   config.GetEndpointsForDiscovery(),
 		DialTimeout: config.GetTimeoutForDiscovery(),
@@ -39,24 +36,23 @@ func NewServiceDiscovery(ctx *context.Context) *ServiceDiscovery {
 // WatchService 初始化服务列表和监视
 func (s *ServiceDiscovery) WatchService(prefix string, set, del func(key, value string)) error {
 	//根据前缀获取现有的key
-	// log.Println("DISCOVERY: Watching prefix:", prefix)
 	resp, err := s.cli.Get(*s.ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return err
 	}
-	log.Println("DISCOVERY: Initial keys found:", len(resp.Kvs))
 
 	for _, ev := range resp.Kvs {
 		set(string(ev.Key), string(ev.Value))
 	}
 	//监视前缀，修改变更的server
-	s.watcher(prefix, set, del)
+	// s.watcher(prefix, set, del)
+	s.watcher(prefix, resp.Header.Revision+1, set, del)
 	return nil
 }
 
 // watcher 监听前缀
-func (s *ServiceDiscovery) watcher(prefix string, set, del func(key, value string)) {
-	rch := s.cli.Watch(*s.ctx, prefix, clientv3.WithPrefix())
+func (s *ServiceDiscovery) watcher(prefix string, rev int64, set, del func(key, value string)) {
+	rch := s.cli.Watch(*s.ctx, prefix, clientv3.WithPrefix(), clientv3.WithRev(rev))
 	logger.CtxInfof(*s.ctx, "watching prefix:%s now...", prefix)
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
