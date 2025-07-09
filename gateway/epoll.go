@@ -45,6 +45,7 @@ func newEPool(listener *net.TCPListener, callBackFunc func(c *connection, ep *ep
 	}
 }
 
+// createAcceptProcess 创建accept处理协程，创建后放入到eChan中待epoll池处理
 func (e *ePool) createAcceptProcess() {
 	go func() {
 		for {
@@ -88,9 +89,9 @@ func (e *ePool) startEPool() {
 	}
 }
 
-// 轮询器池 处理器
+// startEProc 启动一个epoll处理协程
 func (e *ePool) startEProc() {
-	ep, err := newEpoller()
+	ep, err := newEpoller() // 创建一个epoll对象
 	if err != nil {
 		panic(err)
 	}
@@ -103,7 +104,7 @@ func (e *ePool) startEProc() {
 			case conn := <-e.eChan:
 				addTcpNum()
 				fmt.Printf("tcpNum:%d\n", tcpNum)
-				if err := ep.add(conn); err != nil {
+				if err := ep.add(conn); err != nil { // 将连接添加到epoll树中
 					fmt.Printf("failed to add connection to epoll tree %v\n", err)
 					conn.Close() //登录未成功直接关闭连接
 					continue
@@ -118,8 +119,7 @@ func (e *ePool) startEProc() {
 		case <-e.done:
 			return
 		default:
-			connections, err := ep.wait(200) // 200ms 一次轮询避免 忙轮询
-
+			connections, err := ep.wait(200) // 200ms 一次轮询避免 获取读取事件
 			if err != nil && err != syscall.EINTR {
 				fmt.Printf("failed to epoll wait %v\n", err)
 				continue
