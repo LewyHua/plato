@@ -83,6 +83,8 @@ func (e *ePool) createAcceptProcess() {
 	}()
 }
 
+// startEPool 启动epoll池，开启多个epoll对象，从echan获取连接，放入到红黑树，并且轮询处理
+// 以此实现多reactor模型
 func (e *ePool) startEPool() {
 	for i := 0; i < e.eSize; i++ {
 		go e.startEProc()
@@ -104,7 +106,7 @@ func (e *ePool) startEProc() {
 			case conn := <-e.eChan:
 				addTcpNum()
 				fmt.Printf("tcpNum:%d\n", tcpNum)
-				if err := ep.add(conn); err != nil { // 将连接添加到epoll树中
+				if err := ep.add(conn); err != nil { // 将连接添加到epoll树中，注册fd->conn的映射到ep.tables中
 					fmt.Printf("failed to add connection to epoll tree %v\n", err)
 					conn.Close() //登录未成功直接关闭连接
 					continue
@@ -136,7 +138,8 @@ func (e *ePool) startEProc() {
 
 // epoller 对象 轮询器
 type epoller struct {
-	fd int
+	fd            int
+	fdToConnTable sync.Map // fd -> connection 的映射表
 }
 
 func newEpoller() (*epoller, error) {
@@ -150,6 +153,7 @@ func newEpoller() (*epoller, error) {
 }
 
 // TODO: 默认水平触发模式,可采用非阻塞FD,优化边沿触发模式
+// 将连接添加到epoll对象中
 func (e *epoller) add(conn *connection) error {
 	// Extract file descriptor associated with the connection
 	fd := conn.fd
@@ -157,9 +161,13 @@ func (e *epoller) add(conn *connection) error {
 	if err != nil {
 		return err
 	}
-	ep.tables.Store(fd, conn)
+	ep.tables.Store(conn.id, conn)  // 存到全局epoll对象的tables中，id-> connection的映射
+	e.fdToConnTable.Store(fd, conn) // 存到对应epoll对象的fd映射表中，fd-> connection的映射
+	conn.BindEpoller(e)             // 将连接绑定到epoll对象上
 	return nil
 }
+
+// 将连接从epoll对象中删除
 func (e *epoller) remove(conn *connection) error {
 	subTcpNum()
 	fd := conn.fd
@@ -167,9 +175,11 @@ func (e *epoller) remove(conn *connection) error {
 	if err != nil {
 		return err
 	}
-	ep.tables.Delete(fd)
+	ep.tables.Delete(conn.id)
+	e.fdToConnTable.Delete(fd) // 从epoll的fd映射表中删除
 	return nil
 }
+
 func (e *epoller) wait(msec int) ([]*connection, error) {
 	events := make([]unix.EpollEvent, config.GetGatewayEpollWaitQueueSize())
 	n, err := unix.EpollWait(e.fd, events, msec)
@@ -177,9 +187,9 @@ func (e *epoller) wait(msec int) ([]*connection, error) {
 		return nil, err
 	}
 	var connections []*connection
+	// 遍历返回的事件列表，构建连接列表
 	for i := 0; i < n; i++ {
-		//log.Printf("event:%+v\n", events[i])
-		if conn, ok := ep.tables.Load(int(events[i].Fd)); ok {
+		if conn, ok := e.fdToConnTable.Load(int(events[i].Fd)); ok {
 			connections = append(connections, conn.(*connection))
 		}
 	}

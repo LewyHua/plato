@@ -10,10 +10,10 @@ const (
 )
 
 type CmdContext struct {
-	Ctx      *context.Context
-	Cmd      int32
-	FD       int
-	Playload []byte
+	Ctx     *context.Context
+	Cmd     int32
+	ConnID  uint64
+	Payload []byte
 }
 
 type Service struct {
@@ -21,12 +21,13 @@ type Service struct {
 	CmdChannel chan *CmdContext
 }
 
+// DelConn 删除连接
 func (s *Service) DelConn(ctx context.Context, gr *GatewayRequest) (*GatewayResponse, error) {
 	c := context.TODO()
 	s.CmdChannel <- &CmdContext{
-		Ctx: &c,
-		Cmd: DelConnCmd,
-		FD:  int(gr.GetFd()),
+		Ctx:    &c,
+		Cmd:    DelConnCmd,
+		ConnID: gr.ConnID,
 	}
 	return &GatewayResponse{
 		Code: 0,
@@ -34,13 +35,14 @@ func (s *Service) DelConn(ctx context.Context, gr *GatewayRequest) (*GatewayResp
 	}, nil
 }
 
+// Push 推送数据到连接
 func (s *Service) Push(ctx context.Context, gr *GatewayRequest) (*GatewayResponse, error) {
 	c := context.TODO()
 	s.CmdChannel <- &CmdContext{
-		Ctx:      &c,
-		Cmd:      PushCmd,
-		FD:       int(gr.GetFd()),
-		Playload: gr.GetData(),
+		Ctx:     &c,
+		Cmd:     PushCmd,
+		ConnID:  gr.ConnID,
+		Payload: gr.GetData(),
 	}
 	return &GatewayResponse{
 		Code: 0,

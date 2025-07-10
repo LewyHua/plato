@@ -29,7 +29,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
-require google.golang.org/protobuf v1.36.1 // indirect
+require google.golang.org/protobuf v1.36.1
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

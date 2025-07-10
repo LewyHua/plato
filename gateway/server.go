@@ -53,29 +53,31 @@ func RunMain(path string) {
 	s.Start(context.TODO())
 }
 
+// epoll wait 的回调处理函数
 func runProc(c *connection, ep *epoller) {
 	ctx := context.Background() // 起始的contenxt
-	// step1: 读取一个完整的消息包
+	// step1: 以LT模式读取，所以一次只读取一个datā包
 	dataBuf, err := tcp.ReadData(c.conn)
 	if err != nil {
 		// 如果读取conn时发现连接关闭，则直接端口连接
 		// 通知 state 清理掉意外退出的 conn的状态信息
 		if errors.Is(err, io.EOF) {
 			// 这步操作是异步的，不需要等到返回成功在进行，因为消息可靠性的保障是通过协议完成的而非某次cmd
-			ep.remove(c)
-			client.CancelConn(&ctx, getEndpoint(), int32(c.fd), nil)
+			ep.remove(c) // 从红黑树中删除该连接，以及从ep.tables中删除该映射
+			client.CancelConn(&ctx, getEndpoint(), c.id, nil)
 		}
 		return
 	}
 	err = wPool.Submit(func() {
 		// step2:交给 state server rpc 处理
-		client.SendMsg(&ctx, getEndpoint(), int32(c.fd), dataBuf)
+		client.SendMsg(&ctx, getEndpoint(), c.id, dataBuf)
 	})
 	if err != nil {
-		fmt.Errorf("runProc:err:%+v\n", err.Error())
+		log.Printf("runProc:err:%+v\n", err.Error())
 	}
 }
 
+// 处理两种命令：删除连接、和发送消息到连接
 func cmdHandler() {
 	for cmd := range cmdChannel {
 		// 异步提交到协池中完成发送任务
@@ -89,19 +91,26 @@ func cmdHandler() {
 		}
 	}
 }
+
+// 关闭连接的处理函数
 func closeConn(cmd *service.CmdContext) {
-	if connPtr, ok := ep.tables.Load(cmd.FD); ok {
+	log.Println("close:", cmd.ConnID)
+	subTcpNum()
+	if connPtr, ok := ep.tables.Load(cmd.ConnID); ok {
 		conn, _ := connPtr.(*connection)
-		conn.Close()
-		ep.tables.Delete(cmd.FD)
+		conn.Close() // 因为只有gateway有这个fd，所以关闭时会自动从epoll中删除
+		ep.tables.Delete(cmd.ConnID)
+		conn.e.fdToConnTable.Delete(conn.fd) // 从epoll的fd映射表中删除
 	}
 }
+
+// 发送消息到连接的处理函数
 func sendMsgByCmd(cmd *service.CmdContext) {
-	if connPtr, ok := ep.tables.Load(cmd.FD); ok {
+	if connPtr, ok := ep.tables.Load(cmd.ConnID); ok {
 		conn, _ := connPtr.(*connection)
 		dp := tcp.DataPgk{
-			Len:  uint32(len(cmd.Playload)),
-			Data: cmd.Playload,
+			Len:  uint32(len(cmd.Payload)),
+			Data: cmd.Payload,
 		}
 		tcp.SendData(conn.conn, dp.Marshal())
 	}

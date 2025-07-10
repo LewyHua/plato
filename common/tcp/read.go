@@ -8,14 +8,17 @@ import (
 	"time"
 )
 
+// ReadData 从TCP连接中读取数据，先大端读取数据长度，然后读取数据内容
+// 返回读取到的数据内容和可能的错误
 func ReadData(conn *net.TCPConn) ([]byte, error) {
 	var dataLen uint32
 	dataLenBuf := make([]byte, 4)
+	// 读取数据长度
 	if err := readFixedData(conn, dataLenBuf); err != nil {
 		return nil, err
 	}
-	// fmt.Printf("readFixedData:%+v\n", dataLenBuf)
 	buffer := bytes.NewBuffer(dataLenBuf)
+	// 将读取到的长度转换为大端字节序
 	if err := binary.Read(buffer, binary.BigEndian, &dataLen); err != nil {
 		return nil, fmt.Errorf("read headlen error:%s", err.Error())
 	}
@@ -23,7 +26,7 @@ func ReadData(conn *net.TCPConn) ([]byte, error) {
 		return nil, fmt.Errorf("wrong headlen :%d", dataLen)
 	}
 	dataBuf := make([]byte, dataLen)
-	// fmt.Printf("readFixedData.dataLen:%+v\n", dataLen)
+	// 读取数据内容
 	if err := readFixedData(conn, dataBuf); err != nil {
 		return nil, fmt.Errorf("read headlen error:%s", err.Error())
 	}
